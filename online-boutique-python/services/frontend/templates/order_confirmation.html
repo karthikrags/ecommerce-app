@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="text-center py-4">
+  <div style="font-size:4rem;">✅</div>
+  <h2 class="mt-3">Order Confirmed!</h2>
+  <p class="text-muted">Your order has been placed successfully.</p>
+</div>
+
+<div class="card mx-auto" style="max-width:600px;">
+  <div class="card-header fw-bold">Order Summary</div>
+  <div class="card-body">
+    <p><strong>Order ID:</strong> {{ order.order_id }}</p>
+    <p><strong>Tracking ID:</strong> {{ order.shipping_tracking_id }}</p>
+    <p><strong>Shipping Cost:</strong>
+      {{ order.shipping_cost.currency_code }}
+      {{ order.shipping_cost.units }}.{{ "%02d" | format(order.shipping_cost.nanos // 10000000) }}
+    </p>
+    <p><strong>Shipping To:</strong>
+      {{ order.shipping_address.street_address }},
+      {{ order.shipping_address.city }},
+      {{ order.shipping_address.state }}
+      {{ order.shipping_address.zip_code }},
+      {{ order.shipping_address.country }}
+    </p>
+
+    <h6 class="mt-3">Items</h6>
+    <ul class="list-group list-group-flush">
+      {% for item in order.items %}
+      <li class="list-group-item d-flex justify-content-between">
+        <span>{{ item.item.product_id }} × {{ item.item.quantity }}</span>
+        <span class="text-success fw-bold">
+          {{ item.cost.currency_code }} {{ item.cost.units }}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="text-center mt-4">
+  <a href="/" class="btn btn-primary">Continue Shopping</a>
+</div>
+
+{% endblock %}
