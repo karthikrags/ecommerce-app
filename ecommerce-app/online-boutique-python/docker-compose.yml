@@ -1,0 +1,164 @@
+version: "3.9"
+
+# Online Boutique – Python Microservices
+# Run: docker-compose up --build
+#
+# Before first build, generate proto stubs:
+#   bash scripts/generate_proto.sh
+
+x-grpc-service: &grpc-defaults
+  restart: unless-stopped
+  networks:
+    - boutique
+
+services:
+
+  # ── Redis (cart storage) ────────────────────────────────────────────────────
+  redis-cart:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    <<: *grpc-defaults
+
+  # ── Currency Service ────────────────────────────────────────────────────────
+  currencyservice:
+    build:
+      context: services/currency_service
+    environment:
+      PORT: "7000"
+    ports:
+      - "7000:7000"
+    <<: *grpc-defaults
+
+  # ── Product Catalog Service ─────────────────────────────────────────────────
+  productcatalogservice:
+    build:
+      context: services/product_catalog_service
+    environment:
+      PORT: "3550"
+    ports:
+      - "3550:3550"
+    <<: *grpc-defaults
+
+  # ── Cart Service ────────────────────────────────────────────────────────────
+  cartservice:
+    build:
+      context: services/cart_service
+    environment:
+      PORT: "7070"
+      REDIS_ADDR: "redis-cart:6379"
+    ports:
+      - "7070:7070"
+    depends_on:
+      - redis-cart
+    <<: *grpc-defaults
+
+  # ── Recommendation Service ──────────────────────────────────────────────────
+  recommendationservice:
+    build:
+      context: services/recommendation_service
+    environment:
+      PORT: "8080"
+      PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:3550"
+    depends_on:
+      - productcatalogservice
+    <<: *grpc-defaults
+
+  # ── Shipping Service ────────────────────────────────────────────────────────
+  shippingservice:
+    build:
+      context: services/shipping_service
+    environment:
+      PORT: "50051"
+    <<: *grpc-defaults
+
+  # ── Payment Service ─────────────────────────────────────────────────────────
+  paymentservice:
+    build:
+      context: services/payment_service
+    environment:
+      PORT: "50051"
+    <<: *grpc-defaults
+
+  # ── Email Service ───────────────────────────────────────────────────────────
+  emailservice:
+    build:
+      context: services/email_service
+    environment:
+      PORT: "8080"
+    <<: *grpc-defaults
+
+  # ── Checkout Service ────────────────────────────────────────────────────────
+  checkoutservice:
+    build:
+      context: services/checkout_service
+    environment:
+      PORT: "5050"
+      PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:3550"
+      SHIPPING_SERVICE_ADDR: "shippingservice:50051"
+      PAYMENT_SERVICE_ADDR: "paymentservice:50051"
+      EMAIL_SERVICE_ADDR: "emailservice:8080"
+      CURRENCY_SERVICE_ADDR: "currencyservice:7000"
+      CART_SERVICE_ADDR: "cartservice:7070"
+    depends_on:
+      - productcatalogservice
+      - shippingservice
+      - paymentservice
+      - emailservice
+      - currencyservice
+      - cartservice
+    <<: *grpc-defaults
+
+  # ── Ad Service ──────────────────────────────────────────────────────────────
+  adservice:
+    build:
+      context: services/ad_service
+    environment:
+      PORT: "9555"
+    <<: *grpc-defaults
+
+  # ── Frontend ────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: services/frontend
+    environment:
+      PORT: "8080"
+      PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:3550"
+      CURRENCY_SERVICE_ADDR: "currencyservice:7000"
+      CART_SERVICE_ADDR: "cartservice:7070"
+      RECOMMENDATION_SERVICE_ADDR: "recommendationservice:8080"
+      SHIPPING_SERVICE_ADDR: "shippingservice:50051"
+      CHECKOUT_SERVICE_ADDR: "checkoutservice:5050"
+      AD_SERVICE_ADDR: "adservice:9555"
+    ports:
+      - "80:8080"
+    depends_on:
+      - productcatalogservice
+      - currencyservice
+      - cartservice
+      - recommendationservice
+      - shippingservice
+      - checkoutservice
+      - adservice
+    <<: *grpc-defaults
+
+  # ── Load Generator ──────────────────────────────────────────────────────────
+  loadgenerator:
+    build:
+      context: services/load_generator
+    environment:
+      FRONTEND_ADDR: "http://frontend:8080"
+      USERS: "10"
+      RATE: "1"
+    depends_on:
+      - frontend
+    <<: *grpc-defaults
+
+networks:
+  boutique:
+    driver: bridge
+
+volumes:
+  redis-data:
